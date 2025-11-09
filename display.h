@@ -107,6 +107,35 @@ int display_fprintln(FILE *file, const char *__restrict format, ...);
 
 //-------------------------Print to FILE-------------------------\\
 
+//-------------------------Print to string-------------------------\\
+
+/// @brief Writes formatted text to the specified string buffer
+/// @return The number of characters that would have been written, or a negative
+/// value on failure.
+int display_vsnprint(char *buf, size_t size, const char *__restrict format,
+                     va_list args);
+
+/// @brief Writes formatted text to the specified string buffer, followed by a
+/// newline
+/// @return The number of characters that would have been written, or a negative
+/// value on failure.
+int display_vsnprintln(char *buf, size_t size, const char *__restrict format,
+                       va_list args);
+
+/// @brief Writes formatted text to the specified string buffer
+/// @return The number of characters that would have been written, or a negative
+/// value on failure.
+int display_snprint(char *buf, size_t size, const char *__restrict format, ...);
+
+/// @brief Writes formatted text to the specified string buffer, followed by a
+/// newline
+/// @return The number of characters that would have been written, or a negative
+/// value on failure.
+int display_snprintln(char *buf, size_t size, const char *__restrict format,
+                      ...);
+
+//-------------------------Print to string-------------------------\\
+
 
 #endif // DISPLAY_H
 
@@ -694,6 +723,261 @@ int display_fprintln(FILE *file, const char *__restrict format, ...) {
   return result;
 }
 
+int display_vsnprint(char *buf, size_t size, const char *__restrict format,
+                     va_list args) {
+  if (!format)
+    return -1;
+  if (!buf && size > 0)
+    return -1;
+
+  format_specs_array_t specs = find_format_specifiers(format);
+  const char *p = format;
+  int spec_idx = 0;
+
+  char *buf_ptr = buf;
+  size_t remaining_size = size;
+  int total_chars = 0;
+
+  while (*p) {
+    if (*p == '%' && *(p + 1) != '%') {
+      if (spec_idx < specs.count) {
+        int written = 0;
+        switch (specs.data[spec_idx].type) {
+        // Signed integers
+        case TYPE_INT:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr, va_arg(args, int));
+          break;
+        case TYPE_SIGNED_INT8:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr, va_arg(args, int));
+          break;
+        case TYPE_SHORT:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr, va_arg(args, int));
+          break;
+        case TYPE_LONG:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr, va_arg(args, long));
+          break;
+        case TYPE_LONG_LONG:
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
+                       va_arg(args, long long));
+          break;
+        case TYPE_INTMAX_T:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, intmax_t));
+          break;
+        case TYPE_SSIZE_T:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, ssize_t));
+          break;
+        case TYPE_PTRDIFF_T:
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
+                       va_arg(args, ptrdiff_t));
+          break;
+
+        // Unsigned integers
+        case TYPE_UINT:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, unsigned int));
+          break;
+        case TYPE_UINT8:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, unsigned int));
+          break;
+        case TYPE_USHORT:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, unsigned int));
+          break;
+        case TYPE_ULONG:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, unsigned long));
+          break;
+        case TYPE_ULONG_LONG:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, unsigned long long));
+          break;
+        case TYPE_UINTMAX_T:
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
+                       va_arg(args, uintmax_t));
+          break;
+        case TYPE_SIZE_T:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, size_t));
+          break;
+
+        // Pointers
+        case TYPE_POINTER:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, void *));
+          break;
+        case TYPE_STRING:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, char *));
+          break;
+
+        // Reference %n
+        case TYPE_POINTER_INT:
+          *va_arg(args, int *) = total_chars;
+          break;
+        case TYPE_POINTER_SIGNED_INT8:
+          *va_arg(args, signed char *) = total_chars;
+          break;
+        case TYPE_POINTER_SHORT:
+          *va_arg(args, short *) = total_chars;
+          break;
+        case TYPE_POINTER_LONG:
+          *va_arg(args, long *) = total_chars;
+          break;
+        case TYPE_POINTER_LONG_LONG:
+          *va_arg(args, long long *) = total_chars;
+          break;
+        case TYPE_POINTER_INTMAX_T:
+          *va_arg(args, intmax_t *) = total_chars;
+          break;
+        case TYPE_POINTER_SSIZE_T:
+          *va_arg(args, ssize_t *) = total_chars;
+          break;
+        case TYPE_POINTER_PTRDIFF_T:
+          *va_arg(args, ptrdiff_t *) = total_chars;
+          break;
+
+        // Floating point
+        case TYPE_FLOAT:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, double));
+          break;
+        case TYPE_DOUBLE:
+          written = snprintf(buf_ptr, remaining_size,
+                             specs.data[spec_idx].substr,
+                             va_arg(args, double));
+          break;
+        case TYPE_LONG_DOUBLE:
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
+                       va_arg(args, long double));
+          break;
+
+        case TYPE_NONE:
+          break;
+        }
+
+        if (written > 0) {
+          if ((size_t)written < remaining_size) {
+            buf_ptr += written;
+            remaining_size -= written;
+          } else {
+            if (remaining_size > 0)
+              buf_ptr += remaining_size - 1;
+            remaining_size = (remaining_size > 0) ? 1 : 0;
+          }
+          total_chars += written;
+        }
+
+        p += strlen(specs.data[spec_idx].substr);
+        spec_idx++;
+      } else {
+        if (remaining_size > 1) {
+          *buf_ptr++ = *p;
+          remaining_size--;
+        }
+        total_chars++;
+        p++;
+      }
+    } else if (*p == '%' && *(p + 1) == '%') {
+      if (remaining_size > 1) {
+        *buf_ptr++ = '%';
+        remaining_size--;
+      }
+      total_chars++;
+      p += 2;
+    } else if (*p == '{' && *(p + 1) == '}') {
+      display_t *d = va_arg(args, display_t *);
+      if (!d || !d->sndisplay_fn || !d->self) { // Invalid pointer
+        p += 2;
+        continue;
+      }
+
+      int written = d->sndisplay_fn(d->self, buf_ptr, remaining_size);
+      if (written >= 0) {
+        if ((size_t)written < remaining_size) {
+          buf_ptr += written;
+          remaining_size -= written;
+        } else {
+          if (remaining_size > 0)
+            buf_ptr += remaining_size - 1;
+          remaining_size = (remaining_size > 0) ? 1 : 0;
+        }
+        total_chars += written;
+      }
+
+      p += 2;
+    } else {
+      if (remaining_size > 1) {
+        *buf_ptr++ = *p;
+        remaining_size--;
+      }
+      total_chars++;
+      p++;
+    }
+  }
+
+  if (size > 0) {
+    *buf_ptr = '\0';
+  }
+
+  format_specs_array_t_free(&specs);
+
+  return total_chars;
+}
+
+int display_vsnprintln(char *buf, size_t size, const char *__restrict format,
+                       va_list args) {
+  int written = display_vsnprint(buf, size, format, args);
+  if (written < 0)
+    return written;
+
+  if ((size_t)written < size - 1) {
+    buf[written] = '\n';
+    buf[written + 1] = '\0';
+  }
+
+  return written + 1;
+}
+
+int display_snprint(char *buf, size_t size, const char *__restrict format, ...) {
+  va_list args;
+  va_start(args, format);
+  int result = display_vsnprint(buf, size, format, args);
+  va_end(args);
+
+  return result;
+}
+
+int display_snprintln(char *buf, size_t size, const char *__restrict format, ...) {
+  va_list args;
+  va_start(args, format);
+  int result = display_vsnprintln(buf, size, format, args);
+  va_end(args);
+
+  return result;
+}
+
 #ifdef DISPLAY_STRIP_PREFIX
 #define print display_print
 #define println display_println
@@ -703,6 +987,10 @@ int display_fprintln(FILE *file, const char *__restrict format, ...) {
 #define fprintln display_fprintln
 #define vfprint display_vfprint
 #define vfprintln display_vfprintln
+#define snprint display_snprint
+#define snprintln display_snprintln
+#define vsnprint display_vsnprint
+#define vsnprintln display_vsnprintln
 #endif // DISPLAY_STRIP_PREFIX
 
 #endif // DISPLAY_IMPLEMENTATION
