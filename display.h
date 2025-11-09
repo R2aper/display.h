@@ -40,6 +40,28 @@ int display_println(const char *__restrict format, ...);
 
 //------------------------Print to stdout------------------------\\
 
+//-------------------------Print to FILE-------------------------\\
+
+/// @brief Writes formatted text to the specified file stream
+/// @return The number of elements printed or -1 on failure
+int display_vfprint(FILE *file, const char *__restrict format, va_list args);
+
+/// @brief Writes formatted text to the specified file stream, followed by a
+/// newline
+/// @return The number of elements printed or -1 on failure
+int display_vfprintln(FILE *file, const char *__restrict format, va_list args);
+
+/// @brief Writes formatted text to the specified file stream
+/// @return The number of elements printed or -1 on failure
+int display_fprint(FILE *file, const char *__restrict format, ...);
+
+/// @brief Writes formatted text to the specified file stream, followed by a
+/// newline
+/// @return The number of elements printed or -1 on failure
+int display_fprintln(FILE *file, const char *__restrict format, ...);
+
+//-------------------------Print to FILE-------------------------\\
+
 
 #endif // DISPLAY_H
 
@@ -100,9 +122,9 @@ typedef struct format_specs_array_t {
 } format_specs_array_t;
 
 static void format_specs_array_t_free(format_specs_array_t *specs) {
-  for (size_t i = 0; i < specs->count; i++) 
+  for (size_t i = 0; i < specs->count; i++)
     free(specs->data[i].substr);
-  
+
   free(specs->data);
 }
 
@@ -446,6 +468,182 @@ int display_println(const char *__restrict format, ...) {
   va_list args;
   va_start(args, format);
   int result = display_vprintln(format, args);
+  va_end(args);
+
+  return result;
+}
+
+int display_vfprint(FILE *file, const char *__restrict format, va_list args) {
+  if (!format || !file)
+    return -1;
+
+  int spec_count = 0, struct_count = 0;
+  format_specs_array_t specs = find_format_specifiers(format);
+  const char *p = format;
+  int spec_idx = 0;
+
+  while (*p) {
+    if (*p == '%' && *(p + 1) != '%') {
+      if (spec_idx < specs.count) {
+        switch (specs.data[spec_idx].type) {
+        // Signed integers
+        case TYPE_INT:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, int));
+          break;
+        case TYPE_SIGNED_INT8:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, int));
+          break;
+        case TYPE_SHORT:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, int));
+          break;
+        case TYPE_LONG:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, long));
+          break;
+        case TYPE_LONG_LONG:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, long long));
+          break;
+        case TYPE_INTMAX_T:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, intmax_t));
+          break;
+        case TYPE_SSIZE_T:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, ssize_t));
+          break;
+        case TYPE_PTRDIFF_T:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, ptrdiff_t));
+          break;
+
+        // Unsigned integers
+        case TYPE_UINT:
+          fprintf(file, specs.data[spec_idx].substr,
+                  va_arg(args, unsigned int));
+          break;
+        case TYPE_UINT8:
+          fprintf(file, specs.data[spec_idx].substr,
+                  va_arg(args, unsigned int));
+          break;
+        case TYPE_USHORT:
+          fprintf(file, specs.data[spec_idx].substr,
+                  va_arg(args, unsigned int));
+          break;
+        case TYPE_ULONG:
+          fprintf(file, specs.data[spec_idx].substr,
+                  va_arg(args, unsigned long));
+          break;
+        case TYPE_ULONG_LONG:
+          fprintf(file, specs.data[spec_idx].substr,
+                  va_arg(args, unsigned long long));
+          break;
+        case TYPE_UINTMAX_T:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, uintmax_t));
+          break;
+        case TYPE_SIZE_T:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, size_t));
+          break;
+
+        // Pointers
+        case TYPE_POINTER:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, void *));
+          break;
+        case TYPE_STRING:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, char *));
+          break;
+
+        // Reference %n
+        case TYPE_POINTER_INT:
+          *va_arg(args, int *) = spec_count + struct_count;
+          break;
+        case TYPE_POINTER_SIGNED_INT8:
+          *va_arg(args, signed char *) = spec_count + struct_count;
+          break;
+        case TYPE_POINTER_SHORT:
+          *va_arg(args, short *) = spec_count + struct_count;
+          break;
+        case TYPE_POINTER_LONG:
+          *va_arg(args, long *) = spec_count + struct_count;
+          break;
+        case TYPE_POINTER_LONG_LONG:
+          *va_arg(args, long long *) = spec_count + struct_count;
+          break;
+        case TYPE_POINTER_INTMAX_T:
+          *va_arg(args, intmax_t *) = spec_count + struct_count;
+          break;
+        case TYPE_POINTER_SSIZE_T:
+          *va_arg(args, ssize_t *) = spec_count + struct_count;
+          break;
+        case TYPE_POINTER_PTRDIFF_T:
+          *va_arg(args, ptrdiff_t *) = spec_count + struct_count;
+          break;
+
+        // Floating point
+        case TYPE_FLOAT:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, double));
+          break;
+        case TYPE_DOUBLE:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, double));
+          break;
+        case TYPE_LONG_DOUBLE:
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, long double));
+          break;
+
+        case TYPE_NONE:
+          break;
+        }
+        p += strlen(specs.data[spec_idx].substr);
+        spec_idx++;
+        spec_count++;
+      } else {
+        putc(*p, file);
+        p++;
+      }
+    } else if (*p == '%' && *(p + 1) == '%') {
+      putc('%', file);
+      p += 2;
+    } else if (*p == '{' && *(p + 1) == '}') {
+      display_t *d = va_arg(args, display_t *);
+      if (!d || !d->fdisplay_fn || !d->self) { // Invalid pointer
+        p += 2;
+        continue;
+      }
+
+      if (d->fdisplay_fn(d->self, file) == -1) { // Error from fdisplay_fn
+        p += 2;
+        continue;
+      }
+
+      p += 2;
+      struct_count++;
+    } else {
+      putc(*p, file);
+      p++;
+    }
+  }
+
+  format_specs_array_t_free(&specs);
+
+  return spec_count + struct_count;
+}
+
+int display_vfprintln(FILE *file, const char *__restrict format, va_list args) {
+  int result = display_vfprint(file, format, args);
+  if (result != -1)
+    putc('\n', file);
+
+  return result;
+}
+
+int display_fprint(FILE *file, const char *__restrict format, ...) {
+  va_list args;
+  va_start(args, format);
+  int result = display_vfprint(file, format, args);
+  va_end(args);
+
+  return result;
+}
+
+int display_fprintln(FILE *file, const char *__restrict format, ...) {
+  va_list args;
+  va_start(args, format);
+  int result = display_vfprintln(file, format, args);
   va_end(args);
 
   return result;
