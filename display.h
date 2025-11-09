@@ -1,11 +1,56 @@
-/*
-TODO:
+/* display.h
+
+A single-header library for simple/dangerous displaying of custom structs
+
+# Example:
+```c
+#define DISPLAY_IMPLEMENTATION
+#define DISPLAY_STRIP_PREFIX
+#include "display.h"
+
+typedef struct point_t {
+  display_t d; // Should be the first field (this allows casting the struct
+               // pointer to a display_t pointer)
+  int x, y;
+
+} point_t;
+
+int display_point(const void *self) {
+  if(!self)
+    return -1;
+
+  point_t *p = (point_t *)self;
+  return printf("(%d,%d)", p->x, p->y);
+}
+
+int main() {
+  point_t a = {0};
+  a.x = 2;
+  a.y = 3;
+
+  a.d.display_fn = display_point;
+  a.d.self = &a; // WARNING: Be sure that display_t::self points to the object
+                 // itself, otherwise passing it to display_fn results in
+                 // undefined behavior
+
+  println("Point = {}", &a); // Pass a pointer to the struct
+  // Output: Point = (2,3)
+
+  return 0;
+}
+```
+
 */
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
+#include <ctype.h>
+#include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /// @brief The base struct for containing pointers to display functions.
 /// @note  For a struct to be displayable, it must:
@@ -648,5 +693,16 @@ int display_fprintln(FILE *file, const char *__restrict format, ...) {
 
   return result;
 }
+
+#ifdef DISPLAY_STRIP_PREFIX
+#define print display_print
+#define println display_println
+#define vprint display_vprint
+#define vprintln display_vprintln
+#define fprint display_fprint
+#define fprintln display_fprintln
+#define vfprint display_vfprint
+#define vfprintln display_vfprintln
+#endif // DISPLAY_STRIP_PREFIX
 
 #endif // DISPLAY_IMPLEMENTATION
