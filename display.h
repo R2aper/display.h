@@ -51,6 +51,11 @@ int main() {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#define ssize_t int
+#else
+#include <unistd.h>
+#endif
 
 /// @brief The base struct for containing pointers to display functions.
 /// @note  For a struct to be displayable, it must:
@@ -112,15 +117,13 @@ int display_fprintln(FILE *file, const char *__restrict format, ...);
 /// @brief Writes formatted text to the specified string buffer
 /// @return The number of characters that would have been written, or a negative
 /// value on failure.
-int display_vsnprint(char *buf, size_t size, const char *__restrict format,
-                     va_list args);
+int display_vsnprint(char *buf, size_t size, const char *__restrict format, va_list args);
 
 /// @brief Writes formatted text to the specified string buffer, followed by a
 /// newline
 /// @return The number of characters that would have been written, or a negative
 /// value on failure.
-int display_vsnprintln(char *buf, size_t size, const char *__restrict format,
-                       va_list args);
+int display_vsnprintln(char *buf, size_t size, const char *__restrict format, va_list args);
 
 /// @brief Writes formatted text to the specified string buffer
 /// @return The number of characters that would have been written, or a negative
@@ -131,8 +134,7 @@ int display_snprint(char *buf, size_t size, const char *__restrict format, ...);
 /// newline
 /// @return The number of characters that would have been written, or a negative
 /// value on failure.
-int display_snprintln(char *buf, size_t size, const char *__restrict format,
-                      ...);
+int display_snprintln(char *buf, size_t size, const char *__restrict format, ...);
 
 //-------------------------Print to string-------------------------\\
 
@@ -179,7 +181,8 @@ typedef enum var_type {
   TYPE_UINTMAX_T,  // uintmax_t
   TYPE_SIZE_T,     // size_t
 
-  TYPE_NONE, // none
+  TYPE_PERCENT, // %
+  TYPE_NONE,    // none
 
 } var_type;
 
@@ -250,8 +253,7 @@ static format_specs_array_t find_format_specifiers(const char *format) {
       if (strchr("hljztL", *p)) {
         length[0] = *p;
         p++;
-        if ((*p == 'h' || *p == 'l') &&
-            (length[0] == 'h' || length[0] == 'l')) {
+        if ((*p == 'h' || *p == 'l') && (length[0] == 'h' || length[0] == 'l')) {
           length[1] = *p;
           p++;
         }
@@ -279,7 +281,7 @@ static format_specs_array_t find_format_specifiers(const char *format) {
       // Get type
       enum var_type type = -1;
       if (specifier == '%') {
-        type = TYPE_NONE;
+        type = TYPE_PERCENT;
       } else if (specifier == 'p') {
         type = TYPE_POINTER;
       } else if (specifier == 'c') {
@@ -352,12 +354,13 @@ static format_specs_array_t find_format_specifiers(const char *format) {
           type = TYPE_LONG_DOUBLE;
         else
           type = TYPE_DOUBLE;
-      }
+      } else
+        type = TYPE_NONE;
 
-      if (type != -1) {
+      if (type != TYPE_NONE) {
         count++;
-        specs.data = (struct format_spec_t *)realloc(
-            specs.data, count * sizeof(struct format_spec_t));
+        specs.data =
+            (struct format_spec_t *)realloc(specs.data, count * sizeof(struct format_spec_t));
         if (!specs.data) {
           free(sub);
           continue;
@@ -383,7 +386,7 @@ int display_vprint(const char *__restrict format, va_list args) {
   int spec_count = 0, struct_count = 0;
   format_specs_array_t specs = find_format_specifiers(format);
   const char *p = format;
-  int spec_idx = 0;
+  size_t spec_idx = 0;
 
   while (*p) {
     if (*p == '%' && *(p + 1) != '%') {
@@ -485,6 +488,8 @@ int display_vprint(const char *__restrict format, va_list args) {
 
         case TYPE_NONE:
           break;
+        case TYPE_PERCENT:
+          break;
         }
         p += strlen(specs.data[spec_idx].substr);
         spec_idx++;
@@ -554,7 +559,7 @@ int display_vfprint(FILE *file, const char *__restrict format, va_list args) {
   int spec_count = 0, struct_count = 0;
   format_specs_array_t specs = find_format_specifiers(format);
   const char *p = format;
-  int spec_idx = 0;
+  size_t spec_idx = 0;
 
   while (*p) {
     if (*p == '%' && *(p + 1) != '%') {
@@ -588,24 +593,19 @@ int display_vfprint(FILE *file, const char *__restrict format, va_list args) {
 
         // Unsigned integers
         case TYPE_UINT:
-          fprintf(file, specs.data[spec_idx].substr,
-                  va_arg(args, unsigned int));
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, unsigned int));
           break;
         case TYPE_UINT8:
-          fprintf(file, specs.data[spec_idx].substr,
-                  va_arg(args, unsigned int));
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, unsigned int));
           break;
         case TYPE_USHORT:
-          fprintf(file, specs.data[spec_idx].substr,
-                  va_arg(args, unsigned int));
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, unsigned int));
           break;
         case TYPE_ULONG:
-          fprintf(file, specs.data[spec_idx].substr,
-                  va_arg(args, unsigned long));
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, unsigned long));
           break;
         case TYPE_ULONG_LONG:
-          fprintf(file, specs.data[spec_idx].substr,
-                  va_arg(args, unsigned long long));
+          fprintf(file, specs.data[spec_idx].substr, va_arg(args, unsigned long long));
           break;
         case TYPE_UINTMAX_T:
           fprintf(file, specs.data[spec_idx].substr, va_arg(args, uintmax_t));
@@ -660,6 +660,8 @@ int display_vfprint(FILE *file, const char *__restrict format, va_list args) {
           break;
 
         case TYPE_NONE:
+          break;
+        case TYPE_PERCENT:
           break;
         }
         p += strlen(specs.data[spec_idx].substr);
@@ -723,8 +725,7 @@ int display_fprintln(FILE *file, const char *__restrict format, ...) {
   return result;
 }
 
-int display_vsnprint(char *buf, size_t size, const char *__restrict format,
-                     va_list args) {
+int display_vsnprint(char *buf, size_t size, const char *__restrict format, va_list args) {
   if (!format)
     return -1;
   if (!buf && size > 0)
@@ -732,7 +733,7 @@ int display_vsnprint(char *buf, size_t size, const char *__restrict format,
 
   format_specs_array_t specs = find_format_specifiers(format);
   const char *p = format;
-  int spec_idx = 0;
+  size_t spec_idx = 0;
 
   char *buf_ptr = buf;
   size_t remaining_size = size;
@@ -745,89 +746,76 @@ int display_vsnprint(char *buf, size_t size, const char *__restrict format,
         switch (specs.data[spec_idx].type) {
         // Signed integers
         case TYPE_INT:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr, va_arg(args, int));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, int));
           break;
         case TYPE_SIGNED_INT8:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr, va_arg(args, int));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, int));
           break;
         case TYPE_SHORT:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr, va_arg(args, int));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, int));
           break;
         case TYPE_LONG:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr, va_arg(args, long));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, long));
           break;
         case TYPE_LONG_LONG:
-          written =
-              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
-                       va_arg(args, long long));
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
+                             va_arg(args, long long));
           break;
         case TYPE_INTMAX_T:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
                              va_arg(args, intmax_t));
           break;
         case TYPE_SSIZE_T:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
-                             va_arg(args, ssize_t));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, ssize_t));
           break;
         case TYPE_PTRDIFF_T:
-          written =
-              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
-                       va_arg(args, ptrdiff_t));
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
+                             va_arg(args, ptrdiff_t));
           break;
 
         // Unsigned integers
         case TYPE_UINT:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
                              va_arg(args, unsigned int));
           break;
         case TYPE_UINT8:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
                              va_arg(args, unsigned int));
           break;
         case TYPE_USHORT:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
                              va_arg(args, unsigned int));
           break;
         case TYPE_ULONG:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
                              va_arg(args, unsigned long));
           break;
         case TYPE_ULONG_LONG:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
                              va_arg(args, unsigned long long));
           break;
         case TYPE_UINTMAX_T:
-          written =
-              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
-                       va_arg(args, uintmax_t));
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
+                             va_arg(args, uintmax_t));
           break;
         case TYPE_SIZE_T:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
-                             va_arg(args, size_t));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, size_t));
           break;
 
         // Pointers
         case TYPE_POINTER:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
-                             va_arg(args, void *));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, void *));
           break;
         case TYPE_STRING:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
-                             va_arg(args, char *));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, char *));
           break;
 
         // Reference %n
@@ -858,22 +846,21 @@ int display_vsnprint(char *buf, size_t size, const char *__restrict format,
 
         // Floating point
         case TYPE_FLOAT:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
-                             va_arg(args, double));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, double));
           break;
         case TYPE_DOUBLE:
-          written = snprintf(buf_ptr, remaining_size,
-                             specs.data[spec_idx].substr,
-                             va_arg(args, double));
+          written =
+              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr, va_arg(args, double));
           break;
         case TYPE_LONG_DOUBLE:
-          written =
-              snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
-                       va_arg(args, long double));
+          written = snprintf(buf_ptr, remaining_size, specs.data[spec_idx].substr,
+                             va_arg(args, long double));
           break;
 
         case TYPE_NONE:
+          break;
+        case TYPE_PERCENT:
           break;
         }
 
@@ -946,8 +933,7 @@ int display_vsnprint(char *buf, size_t size, const char *__restrict format,
   return total_chars;
 }
 
-int display_vsnprintln(char *buf, size_t size, const char *__restrict format,
-                       va_list args) {
+int display_vsnprintln(char *buf, size_t size, const char *__restrict format, va_list args) {
   int written = display_vsnprint(buf, size, format, args);
   if (written < 0)
     return written;
@@ -999,9 +985,20 @@ MIT License
 
 Copyright (c) 2025 R2aper
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
