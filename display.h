@@ -70,7 +70,7 @@ typedef struct display_t {
 
 } display_t;
 
-//------------------------Print to stdout------------------------\\
+/*------------------------Print to stdout------------------------*/
 
 /// @brief Prints formatted text to stdout
 /// @return The number of elements printed or -1 on failure
@@ -88,9 +88,9 @@ int display_print(const char *__restrict format, ...);
 /// @return The number of elements printed or -1 on failure
 int display_println(const char *__restrict format, ...);
 
-//------------------------Print to stdout------------------------\\
+/*------------------------Print to stdout------------------------*/
 
-//-------------------------Print to FILE-------------------------\\
+/*-------------------------Print to FILE-------------------------*/
 
 /// @brief Writes formatted text to the specified file stream
 /// @return The number of elements printed or -1 on failure
@@ -110,9 +110,9 @@ int display_fprint(FILE *file, const char *__restrict format, ...);
 /// @return The number of elements printed or -1 on failure
 int display_fprintln(FILE *file, const char *__restrict format, ...);
 
-//-------------------------Print to FILE-------------------------\\
+/*-------------------------Print to FILE-------------------------*/
 
-//-------------------------Print to string-------------------------\\
+/*------------------------Print to string------------------------*/
 
 /// @brief Writes formatted text to the specified string buffer
 /// @return The number of characters that would have been written, or a negative
@@ -136,7 +136,7 @@ int display_snprint(char *buf, size_t size, const char *__restrict format, ...);
 /// value on failure.
 int display_snprintln(char *buf, size_t size, const char *__restrict format, ...);
 
-//-------------------------Print to string-------------------------\\
+/*------------------------Print to string------------------------*/
 
 
 #endif // DISPLAY_H
