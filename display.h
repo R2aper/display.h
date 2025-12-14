@@ -138,7 +138,6 @@ int display_snprintln(char *buf, size_t size, const char *__restrict format, ...
 
 /*------------------------Print to string------------------------*/
 
-
 #endif // DISPLAY_H
 
 #ifdef DISPLAY_IMPLEMENTATION
@@ -181,6 +180,7 @@ typedef enum var_type {
   TYPE_UINTMAX_T,  // uintmax_t
   TYPE_SIZE_T,     // size_t
 
+  TYPE_BOOL,    // Boolean
   TYPE_PERCENT, // %
   TYPE_NONE,    // none
 
@@ -259,9 +259,9 @@ static format_specs_array_t find_format_specifiers(const char *format) {
         }
       }
 
-      // Specifiers: d i o u x X e E f F g G a A c s p n %
+      // Specifiers: b(boolean) d i o u x X e E f F g G a A c s p n %
       char specifier = *p;
-      if (strchr("diouxXeEfFgGaAcspn%", specifier)) {
+      if (strchr("bdiouxXeEfFgGaAcspn%", specifier)) {
         p++;
       } else {
         // Invalid specifier
@@ -286,6 +286,8 @@ static format_specs_array_t find_format_specifiers(const char *format) {
         type = TYPE_POINTER;
       } else if (specifier == 'c') {
         type = TYPE_INT;
+      } else if (specifier == 'b') {
+        type = TYPE_BOOL;
       } else if (specifier == 's') {
         type = TYPE_STRING;
       } else if (specifier == 'n') {
@@ -486,6 +488,9 @@ int display_vprint(const char *__restrict format, va_list args) {
           printf(specs.data[spec_idx].substr, va_arg(args, long double));
           break;
 
+        case TYPE_BOOL:
+          printf(va_arg(args, int) ? "True" : "False");
+          break;
         case TYPE_NONE:
           break;
         case TYPE_PERCENT:
@@ -659,6 +664,9 @@ int display_vfprint(FILE *file, const char *__restrict format, va_list args) {
           fprintf(file, specs.data[spec_idx].substr, va_arg(args, long double));
           break;
 
+        case TYPE_BOOL:
+          printf(va_arg(args, int) ? "True" : "False");
+          break;
         case TYPE_NONE:
           break;
         case TYPE_PERCENT:
@@ -858,6 +866,9 @@ int display_vsnprint(char *buf, size_t size, const char *__restrict format, va_l
                              va_arg(args, long double));
           break;
 
+        case TYPE_BOOL:
+          printf(va_arg(args, int) ? "True" : "False");
+          break;
         case TYPE_NONE:
           break;
         case TYPE_PERCENT:
