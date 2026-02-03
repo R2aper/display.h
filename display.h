@@ -975,6 +975,8 @@ int display_snprintln(char *buf, size_t size, const char *__restrict format, ...
   return result;
 }
 
+#endif // DISPLAY_IMPLEMENTATION
+
 #ifdef DISPLAY_STRIP_PREFIX
 #define print display_print
 #define println display_println
@@ -990,7 +992,6 @@ int display_snprintln(char *buf, size_t size, const char *__restrict format, ...
 #define vsnprintln display_vsnprintln
 #endif // DISPLAY_STRIP_PREFIX
 
-#endif // DISPLAY_IMPLEMENTATION
 /*
 MIT License
 
